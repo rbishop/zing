@@ -21,7 +21,7 @@ pub fn main() anyerror!void {
     var params: os.io_uring_params = os.io_uring_params{
         .sq_entries = undefined,
         .cq_entries = undefined,
-        .flags = 1,
+        .flags = 0,
         .sq_thread_cpu = undefined,
         .sq_thread_idle = undefined,
         .features = undefined,
@@ -69,10 +69,10 @@ pub fn main() anyerror!void {
 
     ring.subs.signal(1);
 
-    //var consumed = os.system.io_uring_enter(ring.fd, 1, 1, os.IORING_ENTER_GETEVENTS, null); // do the procsigmask stuff later
-    //_ = try stdout.print("sqes consumed: {}\n", .{consumed});
+    var consumed = os.system.io_uring_enter(ring.fd, 1, 1, os.IORING_ENTER_GETEVENTS, null); // do the procsigmask stuff later
+    _ = try stdout.print("sqes consumed: {}\n", .{consumed});
 
-    _ = std.time.sleep(5 * std.time.second);
+    //_ = std.time.sleep(5 * std.time.second);
 
     _ = try stdout.print("buffer: {}\n", .{buf});
 
@@ -88,8 +88,6 @@ pub fn main() anyerror!void {
             _ = try stdout.print("Received: {}\n", .{buf[0..@intCast(usize, cqe.res)]});
         },
     }
-
-    _ = try stdout.print("EAGAIN? {}\n", .{-os.EAGAIN});
 }
 
 //extern "c" fn ioprio_get(which: u32, who: u32) u16;
