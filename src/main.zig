@@ -4,18 +4,13 @@ const mem = std.mem;
 const net = std.net;
 const os = std.os;
 const io = std.io;
-const Server = std.net.StreamServer;
 const Address = std.net.Address;
 const Ring = @import("ring.zig").Ring;
 
 pub fn main() anyerror!void {
     // std.debug.warn("All your base are belong to us.\n", .{});
     var stdout = &io.getStdOut().outStream().stream;
-    var opts: Server.Options = Server.Options{ .kernel_backlog = 128 };
-    //var server = Server.init(opts);
-
     var addr: Address = try Address.parseIp4("127.0.0.1", @as(u16, 8000));
-    //_ = try server.listen(addr);
 
     // probably want to heap allocate this later
     var params: os.io_uring_params = os.io_uring_params{
@@ -36,7 +31,6 @@ pub fn main() anyerror!void {
     _ = try stdout.print("ring: {}\n", .{ring});
 
     var socket = try os.socket(os.AF_INET, os.SOCK_STREAM | os.SOCK_NONBLOCK, os.IPPROTO_TCP);
-    //var addr = os.net.Address.parseIp("localhost", 8000);
 
     while (true) {
         var res = os.connect(socket, @ptrCast(*os.sockaddr, &addr.in), @sizeOf(os.sockaddr_in)) catch |err| {
@@ -74,8 +68,6 @@ pub fn main() anyerror!void {
 
     //_ = std.time.sleep(5 * std.time.second);
 
-    _ = try stdout.print("buffer: {}\n", .{buf});
-
     var cqe = ring.comps.get();
 
     _ = try stdout.print("cqe: {}\n", .{cqe});
@@ -91,24 +83,3 @@ pub fn main() anyerror!void {
 }
 
 //extern "c" fn ioprio_get(which: u32, who: u32) u16;
-
-//    var connected = true;
-//    var bye_message = "BAI!";
-//
-//    var conn = try server.accept();
-//
-//    while (connected) {
-//        var buf: [128]u8 = undefined;
-//        const bye: []const u8 = "Bye!";
-//        const bytes_read = try conn.file.read(buf[0..]);
-//
-//        if (mem.eql(u8, buf[0 .. bytes_read - 1], bye_message)) {
-//            connected = false;
-//            _ = try conn.file.write(bye);
-//        } else {
-//            _ = try conn.file.write(buf[0..bytes_read]);
-//        }
-//    }
-//
-//    os.close(conn.file.handle);
-//    server.deinit();

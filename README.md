@@ -1,6 +1,6 @@
-# zig-uring
+# zing
 
-Using the new io_uring APIs directly from Linux rather than the liburing wrapper.
+Put some zing in your I/O by using the new io_uring interface on Linux
 
 ## Goals
 
