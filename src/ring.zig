@@ -3,6 +3,26 @@ const builtin = std.builtin;
 const os = std.os;
 const sys = os.system;
 const io = std.io;
+const kernel = @import("kernel.zig");
+
+pub const MAX_SUBS = 4096;
+
+pub const RingSetupError = error{
+    RingSizeTooLarge,
+    RingSizeTooSmall,
+    RingSizeMustBeBaseTwo,
+    NotEnoughFilesProcess,
+    NotEnoughFilesSystem,
+    NotEnoughMemory,
+    PermissionsError,
+    PollRequiresRoot,
+    ParamsOutOfBounds,
+    ReservedDataNotZeroed,
+    InvalidFlags,
+    EntriesOutOfBounds,
+    AffinityRequiresPollMode,
+    InvalidCompletionQueueSize,
+};
 
 pub const Ring = struct {
     fd: i32,
@@ -10,9 +30,33 @@ pub const Ring = struct {
     subs: SubQueue,
     comps: CompQueue,
 
-    pub fn init(size: u32, params: *os.io_uring_params) @This() {
+    pub fn init(size: u32, params: *kernel.RingParams) RingSetupError!Ring {
         var ring: Ring = undefined;
-        ring.fd = @intCast(i32, sys.io_uring_setup(size, params));
+
+        if (size > MAX_SUBS) {
+            return RingSetupError.RingSizeTooLarge;
+        }
+
+        if (size < 1) {
+            return RingSetupError.RingSizeTooSmall;
+        }
+
+        if (size & (size - 1) != 0) {
+            return RingSetupError.RingSizeMustBeBaseTwo;
+        }
+
+        const rc = sys.io_uring_setup(size, @ptrCast(*os.io_uring_params, params));
+
+        switch (os.errno(rc)) {
+            os.EFAULT => return RingSetupError.ParamsOutOfBounds,
+            os.EINVAL => return RingSetupError.InvalidFlags,
+            os.EMFILE => return RingSetupError.NotEnoughFilesProcess,
+            os.ENFILE => return RingSetupError.NotEnoughFilesSystem,
+            os.ENOMEM => return RingSetupError.NotEnoughMemory,
+            os.EPERM => return RingSetupError.PollRequiresRoot,
+            else => ring.fd = @intCast(i32, rc),
+        }
+
         ring.size = size;
         ring.subs = SubQueue.init(params.sq_entries, ring.fd, params.sq_off);
         ring.comps = CompQueue.init(params.cq_entries, ring.fd, params.cq_off);
@@ -37,15 +81,15 @@ pub const SubQueue = struct {
 
     const Self = @This();
 
-    pub fn init(entries: u32, ring_fd: i32, offsets: os.io_sqring_offsets) @This() {
+    pub fn init(entries: u32, ring_fd: i32, offsets: kernel.SubmissionRingOffsets) @This() {
         var subs: SubQueue = undefined;
         subs.size = offsets.array + (entries * @sizeOf(u32));
         subs.mmap_ptr = sys.mmap(null, subs.size, os.PROT_READ | os.PROT_WRITE, os.MAP_SHARED | os.MAP_POPULATE, @intCast(i32, ring_fd), os.IORING_OFF_SQ_RING);
 
         subs.head = @intToPtr(*u32, subs.mmap_ptr + offsets.head);
         subs.tail = @intToPtr(*u32, subs.mmap_ptr + offsets.tail);
-        subs.mask = @intToPtr(*u32, subs.mmap_ptr + offsets.ring_mask);
-        subs.entries = @intToPtr(*u32, subs.mmap_ptr + offsets.ring_entries);
+        subs.mask = @intToPtr(*u32, subs.mmap_ptr + offsets.mask);
+        subs.entries = @intToPtr(*u32, subs.mmap_ptr + offsets.entries);
         subs.flags = @intToPtr(*u32, subs.mmap_ptr + offsets.flags);
         subs.dropped = @intToPtr(*u32, subs.mmap_ptr + offsets.dropped);
         subs.array = @intToPtr([*]u32, subs.mmap_ptr + offsets.array);
@@ -97,15 +141,15 @@ pub const CompQueue = struct {
 
     const Self = @This();
 
-    pub fn init(entries: u32, ring_fd: i32, offsets: os.io_cqring_offsets) @This() {
+    pub fn init(entries: u32, ring_fd: i32, offsets: kernel.CompletionRingOffsets) @This() {
         var comps: CompQueue = undefined;
         comps.size = offsets.cqes + (entries * @sizeOf(u32));
         comps.mmap_ptr = sys.mmap(null, comps.size, os.PROT_READ | os.PROT_WRITE, os.MAP_SHARED | os.MAP_POPULATE, ring_fd, os.IORING_OFF_SQ_RING);
 
         comps.head = @intToPtr(*u32, comps.mmap_ptr + offsets.head);
         comps.tail = @intToPtr(*u32, comps.mmap_ptr + offsets.tail);
-        comps.mask = @intToPtr(*u32, comps.mmap_ptr + offsets.ring_mask);
-        comps.entries = @intToPtr(*u32, comps.mmap_ptr + offsets.ring_entries);
+        comps.mask = @intToPtr(*u32, comps.mmap_ptr + offsets.mask);
+        comps.entries = @intToPtr(*u32, comps.mmap_ptr + offsets.entries);
         comps.overflow = @intToPtr(*u32, comps.mmap_ptr + offsets.overflow);
         comps.cqes = @intToPtr([*]os.io_uring_cqe, comps.mmap_ptr + offsets.cqes);
 

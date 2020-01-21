@@ -6,6 +6,7 @@ const os = std.os;
 const io = std.io;
 const Address = std.net.Address;
 const Ring = @import("ring.zig").Ring;
+const RingParams = @import("kernel.zig").RingParams;
 
 pub fn main() anyerror!void {
     // std.debug.warn("All your base are belong to us.\n", .{});
@@ -13,20 +14,22 @@ pub fn main() anyerror!void {
     var addr: Address = try Address.parseIp4("127.0.0.1", @as(u16, 8000));
 
     // probably want to heap allocate this later
-    var params: os.io_uring_params = os.io_uring_params{
-        .sq_entries = undefined,
-        .cq_entries = undefined,
-        .flags = 0,
-        .sq_thread_cpu = undefined,
-        .sq_thread_idle = undefined,
-        .features = undefined,
-        .resv = [_]u32{0} ** 4,
-        .sq_off = undefined,
-        .cq_off = undefined,
-    };
+    //    var params: os.io_uring_params = os.io_uring_params{
+    //        .sq_entries = undefined,
+    //        .cq_entries = undefined,
+    //        .flags = 0,
+    //        .sq_thread_cpu = undefined,
+    //        .sq_thread_idle = undefined,
+    //        .features = undefined,
+    //        .resv = [_]u32{0} ** 4,
+    //        .sq_off = undefined,
+    //        .cq_off = undefined,
+    //    };
+
+    var params = RingParams{};
 
     const size: u32 = 8;
-    var ring = Ring.init(8, &params);
+    var ring = try Ring.init(8, &params);
     _ = try stdout.print("params: {}\n", .{params});
     _ = try stdout.print("ring: {}\n", .{ring});
 
