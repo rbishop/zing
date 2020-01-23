@@ -27,8 +27,6 @@ pub fn main() anyerror!void {
     //    };
 
     var params = RingParams{};
-
-    const size: u32 = 8;
     var ring = try Ring.init(8, &params);
     _ = try stdout.print("params: {}\n", .{params});
     _ = try stdout.print("ring: {}\n", .{ring});
@@ -75,12 +73,12 @@ pub fn main() anyerror!void {
 
     _ = try stdout.print("cqe: {}\n", .{cqe});
 
-    switch (cqe.res) {
+    switch (cqe.result) {
         std.math.minInt(i32)...-1 => {
-            _ = try stdout.print("Error: {}\n", .{cqe.res});
+            _ = try stdout.print("Error: {}\n", .{cqe.result});
         },
         0...std.math.maxInt(i32) => {
-            _ = try stdout.print("Received: {}\n", .{buf[0..@intCast(usize, cqe.res)]});
+            _ = try stdout.print("Received: {}\n", .{buf[0..@intCast(usize, cqe.result)]});
         },
     }
 }

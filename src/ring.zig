@@ -137,7 +137,7 @@ pub const CompQueue = struct {
 
     mmap_ptr: usize,
     size: u32,
-    cqes: [*]os.io_uring_cqe,
+    cqes: [*]kernel.CompletionEntry,
 
     const Self = @This();
 
@@ -151,13 +151,13 @@ pub const CompQueue = struct {
         comps.mask = @intToPtr(*u32, comps.mmap_ptr + offsets.mask);
         comps.entries = @intToPtr(*u32, comps.mmap_ptr + offsets.entries);
         comps.overflow = @intToPtr(*u32, comps.mmap_ptr + offsets.overflow);
-        comps.cqes = @intToPtr([*]os.io_uring_cqe, comps.mmap_ptr + offsets.cqes);
+        comps.cqes = @intToPtr([*]kernel.CompletionEntry, comps.mmap_ptr + offsets.cqes);
 
         return comps;
     }
 
     // this can probably error or return an optional
-    pub fn get(self: *Self) *os.io_uring_cqe {
+    pub fn get(self: *Self) *kernel.CompletionEntry {
         @fence(builtin.AtomicOrder.SeqCst);
         var idx = self.head.* & self.mask.*;
         var entry = &self.cqes[idx];

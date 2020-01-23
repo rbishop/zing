@@ -8,7 +8,7 @@ pub const RingParams = extern struct {
     sq_thread_cpu: u32 = 0,
     sq_thread_idle: u32 = 0,
     features: u32 = 0,
-    resv: [4]u32 = [_]u32{0} ** 4,
+    reserved: [4]u32 = [_]u32{0} ** 4,
     sq_off: SubmissionRingOffsets = SubmissionRingOffsets{},
     cq_off: CompletionRingOffsets = CompletionRingOffsets{},
 };
