@@ -1,6 +1,6 @@
 # zing
 
-Put some zing in your I/O by using the new io_uring interface on Linux
+Put some zing in your I/O with the new io_uring interface on Linux
 
 ## Goals
 
@@ -17,26 +17,34 @@ this library should be able to write highly optimal disk and network I/O
 routines without needing to be operating systems experts.
 
 **Clear, correct code using Zig features and idioms**
-Features such as ErrorSets and comptime Generics should make it easy to write
-code with proper error handling as well as provide ways for users to discover
-how to best use the library and maybe even learn a thing or two about I/O APIs.
+Features such as ErrorSets, comptime Generics, and defer should make it easy to
+write code with proper error handling as well as provide ways for users to
+discover how to best use the library and maybe even learn a thing or two about
+I/O APIs.
 
 **Just have fun**
 I don't have any skin in this game. I just wanna have some fun and experiment.
 I might try some really weird shit.
 
-## uring concerns
+## uring concerns/features
 
+Here's a laundry list of things I want this library to support:
+
+Bare minimum functionality:
 - uring initialization, memory mapping
 - memory ordering during entry submission and retrieval
-- poll mode vs interrupt mode
 - registering fixed buffers and files
-- linked operations
+
+Additional features:
+- poll mode vs interrupt mode
+- linked I/O operations
 - deciding when to enter (and potentially block waiting on processed entries) vs add more entries
 
 ## Design
 
-This library will provide abstractions at multiple layers. Off the top of my head I can see:
+This library will provide abstractions at multiple layers. I'll prioritize
+starting at the lower layers and working up to the higher layers. Off the top
+of my head I can see:
 
 **Layer 1**
 Rudimentary wrapping of io_uring's APIs and data structures into an
@@ -48,14 +56,20 @@ and user space.
 Abstract away the manipulation of Submission and Completion Queues. Provide
 ErrorSets over submitting and retrieving entries to the queues.
 
+**Layer 3**
+APIs with type constraints that help the user submit system calls correctly.
+For example, use Zig's type system to enforce that the READV op code is also
+combined with a SQE containing iov's.
+
+**Layer 4**
+Provide Socket and File abstractions that use io_uring underneath.
+
 **Layer2.1**
 An additional experiment might be to think of io_uring as a generic interface
 for doing *all* system calls asynchronously and leave the concept of I/O out of
-it. Consider an uring_os module with read, write, fsync, etc. system calls
-defined that run on a global (thread local?) io_uring instance.
+it. For example, consider an uring_os module with read, write, fsync, etc.
+system calls defined that run on a global (thread local?) io_uring instance.
 
-**Layer 3**
-Provide Socket and File abstractions that use io_uring underneath.
 
 ## TODO
 
@@ -66,9 +80,10 @@ Provide Socket and File abstractions that use io_uring underneath.
   to raise mis-use errors at comptime rather than runtime.
 
 ## Experiments
-- Using very fine error types to try and help the user figure out the error.
-  See RingSetupError in src/ring.zig for an example.
+
+- Using very fine-grained error types to try and help the user figure out the
+  error. See RingSetupError in src/ring.zig for an example.
 - Mapping the SQE operations to more clear names despite them not always
   exactly representing the system call. This reads nicer but might not make it
   obvious which system call is being used underneath. See Operations enum in
-  src/kernel.zig.
+  src/kernel.zig for an example.
