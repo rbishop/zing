@@ -1,9 +1,10 @@
-const std = import("std");
+const std = @import("std");
 const io = std.io;
+const os = std.os;
 
 pub const RingParams = extern struct {
-    sq_entries: u32 = 0,
-    cq_entries: u32 = 0,
+    sq_capacity: u32 = 0,
+    cq_capacity: u32 = 0,
     flags: u32 = 0,
     sq_thread_cpu: u32 = 0,
     sq_thread_idle: u32 = 0,
@@ -56,15 +57,15 @@ pub const Offsets = extern enum(u64) {
 };
 
 pub const SubmissionEntry = extern struct {
-    op: Op,
-    flags: EntryFlag,
-    priority: u16,
+    op: Operation,
+    flags: EntryFlag = undefined,
+    priority: u16 = 0,
     fd: i32,
-    data: ExtraData, //off | addr2 // extra data for sys calls that need them
+    data: ExtraData = undefined, //off | addr2 // extra data for sys calls that need them
     ptr: u64,
     len: u32,
-    op_flags: OpFlag,
-    user_data: u64,
+    op_flags: OpFlag = undefined,
+    user_data: u64 = undefined,
 };
 
 pub const EntryFlag = extern enum(u8) {
@@ -81,7 +82,7 @@ pub const ExtraData = extern union {
 };
 
 pub const OpFlag = extern union {
-    rw: os.rw_flags,
+    rw: os.kernel_rwf,
     fsync: u32,
     poll_events: u16,
     sync_range: u32,
@@ -100,7 +101,7 @@ pub const CompletionEntry = extern struct {
     flags: u32,
 };
 
-pub const Operations = enum(u8) {
+pub const Operation = extern enum(u8) {
     NoOp,
     Readv,
     Writev,

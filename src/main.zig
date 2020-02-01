@@ -6,6 +6,7 @@ const os = std.os;
 const io = std.io;
 const Address = std.net.Address;
 const Ring = @import("ring.zig").Ring;
+const kernel = @import("kernel.zig");
 const RingParams = @import("kernel.zig").RingParams;
 
 pub fn main() anyerror!void {
@@ -55,10 +56,10 @@ pub fn main() anyerror!void {
 
     var sqe = ring.subs.next();
 
-    sqe.opcode = os.IORING_OP_READV;
+    sqe.op = kernel.Operation.Readv;
     sqe.fd = socket;
-    sqe.off = 0;
-    sqe.addr = @ptrToInt(&iov);
+    sqe.data = kernel.ExtraData{ .offset = 0 };
+    sqe.ptr = @ptrToInt(&iov);
     sqe.len = 1;
     sqe.user_data = 79;
 
@@ -73,14 +74,11 @@ pub fn main() anyerror!void {
 
     _ = try stdout.print("cqe: {}\n", .{cqe});
 
-    switch (cqe.result) {
-        std.math.minInt(i32)...-1 => {
-            _ = try stdout.print("Error: {}\n", .{cqe.result});
-        },
-        0...std.math.maxInt(i32) => {
-            _ = try stdout.print("Received: {}\n", .{buf[0..@intCast(usize, cqe.result)]});
-        },
+    if (cqe.result < 0) {
+        try stdout.print("Error: {}\n", .{cqe.result});
     }
+
+    _ = try stdout.print("Received: {}\n", .{buf[0..@intCast(usize, cqe.result)]});
 }
 
 //extern "c" fn ioprio_get(which: u32, who: u32) u16;
