@@ -78,6 +78,8 @@ system calls defined that run on a global (thread local?) io_uring instance.
 - Is Zig's type system good enough that I can create constraints such that
   using a particular OpCode requires setting other fields? I'd like to be able
   to raise mis-use errors at comptime rather than runtime.
+- sys.zig module should only be used by this library. Remove any use of it from
+  main.zig
 
 ## Experiments
 

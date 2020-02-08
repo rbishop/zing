@@ -6,26 +6,13 @@ const os = std.os;
 const io = std.io;
 const Address = std.net.Address;
 const Ring = @import("ring.zig").Ring;
-const kernel = @import("kernel.zig");
-const RingParams = @import("kernel.zig").RingParams;
+const sys = @import("sys.zig");
+const RingParams = @import("sys.zig").RingParams;
 
 pub fn main() anyerror!void {
     // std.debug.warn("All your base are belong to us.\n", .{});
     var stdout = &io.getStdOut().outStream().stream;
     var addr: Address = try Address.parseIp4("127.0.0.1", @as(u16, 8000));
-
-    // probably want to heap allocate this later
-    //    var params: os.io_uring_params = os.io_uring_params{
-    //        .sq_entries = undefined,
-    //        .cq_entries = undefined,
-    //        .flags = 0,
-    //        .sq_thread_cpu = undefined,
-    //        .sq_thread_idle = undefined,
-    //        .features = undefined,
-    //        .resv = [_]u32{0} ** 4,
-    //        .sq_off = undefined,
-    //        .cq_off = undefined,
-    //    };
 
     var params = RingParams{};
     var ring = try Ring.init(8, &params);
@@ -56,9 +43,9 @@ pub fn main() anyerror!void {
 
     var sqe = ring.subs.next();
 
-    sqe.op = kernel.Operation.Readv;
+    sqe.op = sys.Operation.Readv;
     sqe.fd = socket;
-    sqe.data = kernel.ExtraData{ .offset = 0 };
+    sqe.data = sys.ExtraData{ .offset = 0 };
     sqe.ptr = @ptrToInt(&iov);
     sqe.len = 1;
     sqe.user_data = 79;

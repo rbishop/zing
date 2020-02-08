@@ -3,7 +3,7 @@ const builtin = std.builtin;
 const os = std.os;
 const sys = os.system;
 const io = std.io;
-const kernel = @import("kernel.zig");
+const sys = @import("sys.zig");
 
 pub const MAX_SUBS = 4096;
 
@@ -30,9 +30,9 @@ pub const Ring = struct {
     subs: SubQueue,
     comps: CompQueue,
 
-    pub fn init(size: u32, params: *kernel.RingParams) RingSetupError!Ring {
-        var ring: Ring = undefined;
+    const Self = @This();
 
+    pub fn init(size: u32, params: *sys.RingParams) RingSetupError!Ring {
         if (size > MAX_SUBS) {
             return RingSetupError.RingSizeTooLarge;
         }
@@ -77,11 +77,11 @@ pub const SubQueue = struct {
 
     mmap_ptr: usize,
     size: u32,
-    sqes: [*]kernel.SubmissionEntry,
+    sqes: [*]sys.SubmissionEntry,
 
     const Self = @This();
 
-    pub fn init(capacity: u32, ring_fd: i32, offsets: kernel.SubmissionRingOffsets) @This() {
+    pub fn init(capacity: u32, ring_fd: i32, offsets: sys.SubmissionRingOffsets) @This() {
         var subs: SubQueue = undefined;
         subs.size = offsets.array + (capacity * @sizeOf(u32));
         subs.mmap_ptr = sys.mmap(null, subs.size, os.PROT_READ | os.PROT_WRITE, os.MAP_SHARED | os.MAP_POPULATE, @intCast(i32, ring_fd), os.IORING_OFF_SQ_RING);
@@ -96,7 +96,7 @@ pub const SubQueue = struct {
 
         var sqe_size = capacity + @sizeOf(os.io_uring_sqe);
         var sqe_ptr = sys.mmap(null, sqe_size, os.PROT_READ | os.PROT_WRITE, os.MAP_SHARED | os.MAP_POPULATE, ring_fd, os.IORING_OFF_SQES);
-        subs.sqes = @intToPtr([*]kernel.SubmissionEntry, sqe_ptr);
+        subs.sqes = @intToPtr([*]sys.SubmissionEntry, sqe_ptr);
 
         return subs;
     }
@@ -104,7 +104,7 @@ pub const SubQueue = struct {
     // This can error, add error type later
     // I should also think of an API that makes this re-entrant
     // consider supporting multi threading, though maybe rings should be owned by threads
-    pub fn next(self: *Self) *kernel.SubmissionEntry {
+    pub fn next(self: *Self) *sys.SubmissionEntry {
         var index = self.tail.* & self.mask.*;
         return &self.sqes[index];
     }
@@ -137,11 +137,11 @@ pub const CompQueue = struct {
 
     mmap_ptr: usize,
     size: u32,
-    cqes: [*]kernel.CompletionEntry,
+    cqes: [*]sys.CompletionEntry,
 
     const Self = @This();
 
-    pub fn init(capacity: u32, ring_fd: i32, offsets: kernel.CompletionRingOffsets) @This() {
+    pub fn init(capacity: u32, ring_fd: i32, offsets: sys.CompletionRingOffsets) @This() {
         var comps: CompQueue = undefined;
         comps.size = offsets.cqes + (capacity * @sizeOf(u32));
         comps.mmap_ptr = sys.mmap(null, comps.size, os.PROT_READ | os.PROT_WRITE, os.MAP_SHARED | os.MAP_POPULATE, ring_fd, os.IORING_OFF_SQ_RING);
@@ -151,13 +151,13 @@ pub const CompQueue = struct {
         comps.mask = @intToPtr(*u32, comps.mmap_ptr + offsets.mask);
         comps.entries = @intToPtr(*u32, comps.mmap_ptr + offsets.entries);
         comps.overflow = @intToPtr(*u32, comps.mmap_ptr + offsets.overflow);
-        comps.cqes = @intToPtr([*]kernel.CompletionEntry, comps.mmap_ptr + offsets.cqes);
+        comps.cqes = @intToPtr([*]sys.CompletionEntry, comps.mmap_ptr + offsets.cqes);
 
         return comps;
     }
 
     // this can probably error or return an optional
-    pub fn get(self: *Self) *kernel.CompletionEntry {
+    pub fn get(self: *Self) *sys.CompletionEntry {
         @fence(builtin.AtomicOrder.SeqCst);
         var idx = self.head.* & self.mask.*;
         var entry = &self.cqes[idx];
