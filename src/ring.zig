@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = std.builtin;
 const os = std.os;
-const sys = os.system;
+const kernel = os.system;
 const io = std.io;
 const sys = @import("sys.zig");
 
@@ -45,24 +45,28 @@ pub const Ring = struct {
             return RingSetupError.RingSizeMustBeBaseTwo;
         }
 
-        const rc = sys.io_uring_setup(size, @ptrCast(*os.io_uring_params, params));
+        const rc = kernel.io_uring_setup(size, @ptrCast(*os.io_uring_params, params));
 
-        switch (os.errno(rc)) {
+        var ring_fd = switch (os.errno(rc)) {
             os.EFAULT => return RingSetupError.ParamsOutOfBounds,
             os.EINVAL => return RingSetupError.InvalidFlags,
             os.EMFILE => return RingSetupError.NotEnoughFilesProcess,
             os.ENFILE => return RingSetupError.NotEnoughFilesSystem,
             os.ENOMEM => return RingSetupError.NotEnoughMemory,
             os.EPERM => return RingSetupError.PollRequiresRoot,
-            else => ring.fd = @intCast(i32, rc),
-        }
+            else => @intCast(i32, rc),
+        };
 
-        ring.size = size;
-        ring.subs = SubQueue.init(params.sq_capacity, ring.fd, params.sq_off);
-        ring.comps = CompQueue.init(params.cq_capacity, ring.fd, params.cq_off);
-        //var stdout = &io.getStdOut().outStream().stream;
+        return Ring{
+            .fd = ring_fd,
+            .size = size,
+            .subs = SubQueue.init(params.sq_capacity, ring_fd, params.sq_off),
+            .comps = CompQueue.init(params.cq_capacity, ring_fd, params.cq_off),
+        };
+    }
 
-        return ring;
+    pub fn enter(self: *Self, submitted: u16, min_want: u16) u16 {
+        return kernel.io_uring_enter(self.fd, submitted, min_want, os.IORING_ENTER_GETEVENTS, null); // do the procsigmask stuff later
     }
 };
 
@@ -84,7 +88,7 @@ pub const SubQueue = struct {
     pub fn init(capacity: u32, ring_fd: i32, offsets: sys.SubmissionRingOffsets) @This() {
         var subs: SubQueue = undefined;
         subs.size = offsets.array + (capacity * @sizeOf(u32));
-        subs.mmap_ptr = sys.mmap(null, subs.size, os.PROT_READ | os.PROT_WRITE, os.MAP_SHARED | os.MAP_POPULATE, @intCast(i32, ring_fd), os.IORING_OFF_SQ_RING);
+        subs.mmap_ptr = kernel.mmap(null, subs.size, os.PROT_READ | os.PROT_WRITE, os.MAP_SHARED | os.MAP_POPULATE, @intCast(i32, ring_fd), os.IORING_OFF_SQ_RING);
 
         subs.head = @intToPtr(*u32, subs.mmap_ptr + offsets.head);
         subs.tail = @intToPtr(*u32, subs.mmap_ptr + offsets.tail);
@@ -95,7 +99,7 @@ pub const SubQueue = struct {
         subs.array = @intToPtr([*]u32, subs.mmap_ptr + offsets.array);
 
         var sqe_size = capacity + @sizeOf(os.io_uring_sqe);
-        var sqe_ptr = sys.mmap(null, sqe_size, os.PROT_READ | os.PROT_WRITE, os.MAP_SHARED | os.MAP_POPULATE, ring_fd, os.IORING_OFF_SQES);
+        var sqe_ptr = kernel.mmap(null, sqe_size, os.PROT_READ | os.PROT_WRITE, os.MAP_SHARED | os.MAP_POPULATE, ring_fd, os.IORING_OFF_SQES);
         subs.sqes = @intToPtr([*]sys.SubmissionEntry, sqe_ptr);
 
         return subs;
@@ -144,7 +148,7 @@ pub const CompQueue = struct {
     pub fn init(capacity: u32, ring_fd: i32, offsets: sys.CompletionRingOffsets) @This() {
         var comps: CompQueue = undefined;
         comps.size = offsets.cqes + (capacity * @sizeOf(u32));
-        comps.mmap_ptr = sys.mmap(null, comps.size, os.PROT_READ | os.PROT_WRITE, os.MAP_SHARED | os.MAP_POPULATE, ring_fd, os.IORING_OFF_SQ_RING);
+        comps.mmap_ptr = kernel.mmap(null, comps.size, os.PROT_READ | os.PROT_WRITE, os.MAP_SHARED | os.MAP_POPULATE, ring_fd, os.IORING_OFF_SQ_RING);
 
         comps.head = @intToPtr(*u32, comps.mmap_ptr + offsets.head);
         comps.tail = @intToPtr(*u32, comps.mmap_ptr + offsets.tail);

@@ -11,7 +11,7 @@ const RingParams = @import("sys.zig").RingParams;
 
 pub fn main() anyerror!void {
     // std.debug.warn("All your base are belong to us.\n", .{});
-    var stdout = &io.getStdOut().outStream().stream;
+    var stdout = &io.getStdOut().outStream();
     var addr: Address = try Address.parseIp4("127.0.0.1", @as(u16, 8000));
 
     var params = RingParams{};
