@@ -65,7 +65,7 @@ pub const Ring = struct {
         };
     }
 
-    pub fn enter(self: *Self, submitted: u16, min_want: u16) u16 {
+    pub fn enter(self: *Self, submitted: u32, min_want: u32) usize {
         return kernel.io_uring_enter(self.fd, submitted, min_want, os.IORING_ENTER_GETEVENTS, null); // do the procsigmask stuff later
     }
 };
@@ -116,6 +116,8 @@ pub const SubQueue = struct {
     // Let's the kernel know we've added submission entries
     // TODO: Make sure num is within the size of the ring
     pub fn signal(self: *Self, num: u16) void {
+        var index = self.tail.* & self.mask.*;
+        self.array[index] = index;
         @fence(builtin.AtomicOrder.SeqCst);
         self.tail.* += num;
         @fence(builtin.AtomicOrder.SeqCst);
@@ -162,16 +164,17 @@ pub const CompQueue = struct {
 
     // this can probably error or return an optional
     pub fn get(self: *Self) *sys.CompletionEntry {
+        var head = self.head.*;
         @fence(builtin.AtomicOrder.SeqCst);
-        var idx = self.head.* & self.mask.*;
-        var entry = &self.cqes[idx];
 
-        // TODO: Relax this to Acquire/Release later
-        @fence(builtin.AtomicOrder.SeqCst);
+        //TODO: if (head != self.tail.*) {}
+        var idx = head & self.mask.*;
+        return &self.cqes[idx];
+    }
+
+    pub fn signal(self: *Self) void {
         self.head.* += 1;
         @fence(builtin.AtomicOrder.SeqCst);
-
-        return entry;
     }
 
     pub fn print(self: *Self) void {
